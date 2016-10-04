@@ -12,6 +12,8 @@ namespace Auth0.Nancy.SelfHost
         public string Nickname { get; set; }
         public string GravatarUrl { get; set; }
         public string Email { get; set; }
+        public string AppMetadata { get; set; }
+        public string UserMetadata { get; set; }
 
         public string UserToken { get; set; }
 

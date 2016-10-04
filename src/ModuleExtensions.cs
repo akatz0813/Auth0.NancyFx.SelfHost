@@ -1,15 +1,15 @@
 ﻿using System.Configuration;
 using Nancy;
 using Nancy.Security;
+using Auth0.AuthenticationApi;
+using System;
+using Auth0.AuthenticationApi.Models;
 
 namespace Auth0.Nancy.SelfHost
 {
     public static class ModuleExtensions
     {
-        private static readonly Auth0.Client Auth0Client = new Auth0.Client(
-            ConfigurationManager.AppSettings["auth0:ClientId"],
-            ConfigurationManager.AppSettings["auth0:ClientSecret"],
-            ConfigurationManager.AppSettings["auth0:Domain"]);
+        private static readonly AuthenticationApiClient Auth0Client = new AuthenticationApiClient(new Uri("https://" + ConfigurationManager.AppSettings["auth0:Domain"]));
 
         public static void RequiresAuthentication(this NancyModule module)
         {
@@ -20,20 +20,29 @@ namespace Auth0.Nancy.SelfHost
         {
             var code = (string) module.Request.Query["code"];
 
-            var token = Auth0Client.ExchangeAuthorizationCodePerAccessToken(code,
-                ConfigurationManager.AppSettings["auth0:CallbackUrl"]);
+            var token = Auth0Client.ExchangeCodeForAccessTokenAsync(new ExchangeCodeRequest
+            {
+                ClientId = ConfigurationManager.AppSettings["auth0:ClientId"],
+                ClientSecret = ConfigurationManager.AppSettings["auth0:ClientSecret"],
+                RedirectUri = ConfigurationManager.AppSettings["auth0:CallbackUrl"],
+                AuthorizationCode = code
 
-            var userInfo = Auth0Client.GetUserInfo(token);
+            }).ConfigureAwait(false).GetAwaiter().GetResult();
+
+            var userInfo = Auth0Client.GetUserInfoAsync(token.AccessToken).ConfigureAwait(false).GetAwaiter().GetResult();
 
             var user = new Auth0User
             {
                 AccessToken = token.AccessToken,
                 UserToken = token.IdToken,
                 UserId = userInfo.UserId,
-                Name = userInfo.Name,
-                Nickname = userInfo.Nickname,
+                Name = userInfo.FullName,
+                Nickname = userInfo.NickName,
                 GravatarUrl = userInfo.Picture,
-                Email = userInfo.Email
+                Email = userInfo.Email,
+                UserMetadata = userInfo.UserMetadata,
+                AppMetadata = userInfo.AppMetadata
+                
             };
 
             Auth0Authentication.CreateAuthenticationSessionFor(user, module.Context.Request.Session);
